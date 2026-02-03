@@ -2,6 +2,29 @@
 
 This twitter downloader doesn't require Credentials or an api key. It's based on [twitter-scrapper](https://github.com/imperatrona/twitter-scraper).
 
+## Recent Changes
+
+### v1.15.0
+- **Filename Generation Improvement**: 
+  - Enhanced filename sanitization to handle special characters, URLs, and emojis
+  - Adjusted tweet content length in filenames to 240 characters for better readability
+
+- **ASS Subtitle Generation**: 
+  - Added automatic ASS subtitle file generation for videos
+  - Supports automatic line wrapping for long subtitles
+  - Configured subtitles to be bottom-center aligned with proper margins
+  - Optimized subtitle resolution settings (PlayResX: 1080, PlayResY: 1920)
+
+- **Logging System Upgrade**: 
+  - Replaced all `fmt.Printf` and `fmt.Println` calls with logrus logging methods
+  - Added detailed logging for all operations
+  - Configured logging format with timestamps and log levels
+
+- **Other Improvements**: 
+  - Added comprehensive error handling
+  - Optimized download process
+  - Improved proxy support
+
 ### Note
 For NSFW or private accounts, you will need to logged in (-L). Username ans password login isn't supported anymore. You'll have to logged in in a browser and copy auth_token and ct0 cookies (right click => inspect => storage => cookies).
 It will create a twmd_cookies.json so you will not have to enter these cookies everytime.
