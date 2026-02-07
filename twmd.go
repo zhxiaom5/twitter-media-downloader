@@ -235,6 +235,67 @@ Dialogue: 0,0:00:00.00,99:59:59.99,Default,,40,40,80,,%s`,
 	}
 }
 
+func saveTweetJSON(tweet interface{}, videoUrl string, output string, dwn_type string) {
+	// Generate JSON filename (same as video but with .json extension)
+	segments := strings.Split(videoUrl, "/")
+	videoName := segments[len(segments)-1]
+	re := regexp.MustCompile(`name=`)
+	if re.MatchString(videoName) {
+		segments := strings.Split(videoName, "?")
+		videoName = segments[len(segments)-2]
+	}
+
+	// Get tweet content for filename
+	tweetContent := "没有推文"
+	pattern := `[/\\:*?"<>|]`
+	regex, _ := regexp.Compile(pattern)
+
+	switch t := tweet.(type) {
+	case *twitterscraper.TweetResult:
+		if t.Text != "" {
+			tweetContent = sanitizeText(t.Text, regex, 240)
+		}
+	case *twitterscraper.Tweet:
+		if t.Text != "" {
+			tweetContent = sanitizeText(t.Text, regex, 240)
+		}
+	}
+
+	// Create JSON filename
+	nameWithoutExt := strings.TrimSuffix(videoName, "."+strings.Split(videoName, ".")[len(strings.Split(videoName, "."))-1])
+	jsonName := nameWithoutExt + "_" + tweetContent + ".json"
+
+	// Create JSON file path
+	var jsonPath string
+	if dwn_type == "user" {
+		if _, err := os.Stat(output + "/video"); os.IsNotExist(err) {
+			os.MkdirAll(output+"/video", os.ModePerm)
+		}
+		jsonPath = output + "/video/" + jsonName
+	} else {
+		if _, err := os.Stat(output); os.IsNotExist(err) {
+			os.MkdirAll(output, os.ModePerm)
+		}
+		jsonPath = output + "/" + jsonName
+	}
+
+	// Marshal tweet to JSON
+	tweetJSON, err := json.MarshalIndent(tweet, "", "  ")
+	if err != nil {
+		logger.Errorf("Failed to marshal tweet to JSON: %s", err.Error())
+		return
+	}
+
+	// Write JSON file
+	err = os.WriteFile(jsonPath, tweetJSON, 0644)
+	if err == nil {
+		logger.Infof("Saved tweet JSON: %s", jsonName)
+		logger.Infof("JSON file path: %s", jsonPath)
+	} else {
+		logger.Errorf("Failed to save tweet JSON: %s", err.Error())
+	}
+}
+
 func downloadThumbnail(wg *sync.WaitGroup, tweet interface{}, video interface{}, videoUrl string, output string, dwn_type string) {
 	defer wg.Done()
 
@@ -475,6 +536,8 @@ func videoUser(wait *sync.WaitGroup, tweet *twitterscraper.TweetResult, output s
 					generateNFOFile(tweet, url, output, "user")
 					// Generate ASS subtitle file
 					generateASSFile(tweet, url, output, "user")
+					// Save tweet JSON
+					saveTweetJSON(tweet, url, output, "user")
 					continue
 				} else {
 					continue
@@ -491,6 +554,8 @@ func videoUser(wait *sync.WaitGroup, tweet *twitterscraper.TweetResult, output s
 			generateNFOFile(tweet, url, output, "user")
 			// Generate ASS subtitle file
 			generateASSFile(tweet, url, output, "user")
+			// Save tweet JSON
+			saveTweetJSON(tweet, url, output, "user")
 		}
 		wg.Wait()
 	}
@@ -540,6 +605,8 @@ func videoSingle(tweet *twitterscraper.Tweet, output string) {
 				generateNFOFile(tweet, url, output, "user")
 				// Generate ASS subtitle file
 				generateASSFile(tweet, url, output, "user")
+				// Save tweet JSON
+				saveTweetJSON(tweet, url, output, "user")
 			} else {
 				wg.Add(1)
 				go download(&wg, tweet, url, "tweet", output, "tweet")
@@ -550,6 +617,8 @@ func videoSingle(tweet *twitterscraper.Tweet, output string) {
 				generateNFOFile(tweet, url, output, "tweet")
 				// Generate ASS subtitle file
 				generateASSFile(tweet, url, output, "tweet")
+				// Save tweet JSON
+				saveTweetJSON(tweet, url, output, "tweet")
 			}
 		}
 		wg.Wait()
