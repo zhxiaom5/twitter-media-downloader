@@ -109,9 +109,18 @@ func generateNFOFile(tweet interface{}, videoUrl string, output string, dwn_type
 		tweetID = t.ID
 	}
 
+	// Get tweet date for filename prefix
+	var tweetDate string
+	switch t := tweet.(type) {
+	case *twitterscraper.TweetResult:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	case *twitterscraper.Tweet:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	}
+
 	// Create nfo filename
 	nameWithoutExt := strings.TrimSuffix(videoName, "."+strings.Split(videoName, ".")[len(strings.Split(videoName, "."))-1])
-	nfoName := nameWithoutExt + "_" + tweetContent + ".nfo"
+	nfoName := tweetDate + "_" + nameWithoutExt + "_" + tweetContent + ".nfo"
 
 	// Create nfo file path
 	var nfoPath string
@@ -186,9 +195,18 @@ func generateASSFile(tweet interface{}, videoUrl string, output string, dwn_type
 		}
 	}
 
+	// Get tweet date for filename prefix
+	var tweetDate string
+	switch t := tweet.(type) {
+	case *twitterscraper.TweetResult:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	case *twitterscraper.Tweet:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	}
+
 	// Create ass filename
 	nameWithoutExt := strings.TrimSuffix(videoName, "."+strings.Split(videoName, ".")[len(strings.Split(videoName, "."))-1])
-	assName := nameWithoutExt + "_" + tweetContent + ".ass"
+	assName := tweetDate + "_" + nameWithoutExt + "_" + tweetContent + ".ass"
 
 	// Create ass file path
 	var assPath string
@@ -261,9 +279,18 @@ func saveTweetJSON(tweet interface{}, videoUrl string, output string, dwn_type s
 		}
 	}
 
+	// Get tweet date for filename prefix
+	var tweetDate string
+	switch t := tweet.(type) {
+	case *twitterscraper.TweetResult:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	case *twitterscraper.Tweet:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	}
+
 	// Create JSON filename
 	nameWithoutExt := strings.TrimSuffix(videoName, "."+strings.Split(videoName, ".")[len(strings.Split(videoName, "."))-1])
-	jsonName := nameWithoutExt + "_" + tweetContent + ".json"
+	jsonName := tweetDate + "_" + nameWithoutExt + "_" + tweetContent + ".json"
 
 	// Create JSON file path
 	var jsonPath string
@@ -374,9 +401,18 @@ func downloadThumbnail(wg *sync.WaitGroup, tweet interface{}, video interface{},
 		}
 	}
 
+	// Get tweet date for filename prefix
+	var tweetDate string
+	switch t := tweet.(type) {
+	case *twitterscraper.TweetResult:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	case *twitterscraper.Tweet:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	}
+
 	// Create thumbnail filename
 	nameWithoutExt := strings.TrimSuffix(videoName, "."+strings.Split(videoName, ".")[len(strings.Split(videoName, "."))-1])
-	thumbnailName := nameWithoutExt + "_" + tweetContent + ".jpg"
+	thumbnailName := tweetDate + "_" + nameWithoutExt + "_" + tweetContent + ".jpg"
 
 	// Download thumbnail
 	req, err := http.NewRequest("GET", thumbnailUrl, nil)
@@ -452,10 +488,19 @@ func download(wg *sync.WaitGroup, tweet interface{}, url string, filetype string
 		}
 	}
 
+	// Get tweet date for filename prefix
+	var tweetDate string
+	switch t := tweet.(type) {
+	case *twitterscraper.TweetResult:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	case *twitterscraper.Tweet:
+		tweetDate = time.Unix(t.Timestamp, 0).Format("2006-01-02")
+	}
+
 	// Add tweet content to filename
 	nameWithoutExt := strings.TrimSuffix(name, "."+strings.Split(name, ".")[len(strings.Split(name, "."))-1])
 	ext := "." + strings.Split(name, ".")[len(strings.Split(name, "."))-1]
-	name = nameWithoutExt + "_" + tweetContent + ext
+	name = tweetDate + "_" + nameWithoutExt + "_" + tweetContent + ext
 
 	if format != "" {
 		name = getFormat(tweet) + "_" + name
@@ -487,8 +532,34 @@ func download(wg *sync.WaitGroup, tweet interface{}, url string, filetype string
 	var f *os.File
 	if dwn_type == "user" {
 		if update {
-			if _, err := os.Stat(output + "/" + filetype + "/" + name); !errors.Is(err, os.ErrNotExist) {
+			// Check both full filename and original filename
+			var filePath string
+			if filetype == "rtimg" {
+				filePath = output + "/img/RE-" + name
+			} else if filetype == "rtvideo" {
+				filePath = output + "/video/RE-" + name
+			} else {
+				filePath = output + "/" + filetype + "/" + name
+			}
+
+			// Check full filename
+			if _, err := os.Stat(filePath); !errors.Is(err, os.ErrNotExist) {
 				logger.Infof("File already exists: %s", name)
+				return
+			}
+
+			// Check original filename (without date and tweet content)
+			originalName := strings.Split(name, "_")[1] + "." + strings.Split(name, ".")[len(strings.Split(name, "."))-1]
+			var originalFilePath string
+			if filetype == "rtimg" {
+				originalFilePath = output + "/img/RE-" + originalName
+			} else if filetype == "rtvideo" {
+				originalFilePath = output + "/video/RE-" + originalName
+			} else {
+				originalFilePath = output + "/" + filetype + "/" + originalName
+			}
+			if _, err := os.Stat(originalFilePath); !errors.Is(err, os.ErrNotExist) {
+				logger.Infof("Original file already exists: %s", originalName)
 				return
 			}
 		}
@@ -501,8 +572,20 @@ func download(wg *sync.WaitGroup, tweet interface{}, url string, filetype string
 		}
 	} else {
 		if update {
-			if _, err := os.Stat(output + "/" + name); !errors.Is(err, os.ErrNotExist) {
+			// Check both full filename and original filename
+			filePath := output + "/" + name
+
+			// Check full filename
+			if _, err := os.Stat(filePath); !errors.Is(err, os.ErrNotExist) {
 				logger.Infof("File already exists: %s", name)
+				return
+			}
+
+			// Check original filename (without date and tweet content)
+			originalName := strings.Split(name, "_")[1] + "." + strings.Split(name, ".")[len(strings.Split(name, "."))-1]
+			originalFilePath := output + "/" + originalName
+			if _, err := os.Stat(originalFilePath); !errors.Is(err, os.ErrNotExist) {
+				logger.Infof("Original file already exists: %s", originalName)
 				return
 			}
 		}
