@@ -26,20 +26,22 @@ import (
 )
 
 var (
-	usr     string
-	format  string
-	proxy   string
-	update  bool
-	onlyrtw bool
-	onlymtw bool
-	vidz    bool
-	imgs    bool
-	urlOnly bool
-	version = "1.15.0"
-	scraper *twitterscraper.Scraper
-	client  *http.Client
-	size    = "orig"
-	datefmt = "2006-01-02"
+	usr       string
+	format    string
+	proxy     string
+	update    bool
+	onlyrtw   bool
+	onlymtw   bool
+	vidz      bool
+	imgs      bool
+	urlOnly   bool
+	authToken string
+	ct0Token  string
+	version   = "1.15.0"
+	scraper   *twitterscraper.Scraper
+	client    *http.Client
+	size      = "orig"
+	datefmt   = "2006-01-02"
 
 	// Logger instance
 	logger = logrus.New()
@@ -765,36 +767,11 @@ func processCookieString(cookieStr string) []*http.Cookie {
 	return cookies
 }
 
-func askPass() {
-	for {
-		var auth_token, ct0 string
-		logger.Info(`  ╔═══════════════════════════════════════════════════════════════╗
-  ║                                                               ║
-  ║  User/pass login is no longer supported,                      ║
-  ║  Log in using a browser and find auth_token and ct0 cookies.  ║
-  ║  (via Inspect → Storage → Cookies).                           ║
-  ║                                                               ║
-  ╚═══════════════════════════════════════════════════════════════╝`)
-		logger.Info()
-		fmt.Printf("auth_token cookie: ")
-		fmt.Scanln(&auth_token)
-		fmt.Printf("ct0 cookie: ")
-		fmt.Scanln(&ct0)
-		scraper.SetAuthToken(twitterscraper.AuthToken{Token: auth_token, CSRFToken: ct0})
-		if !scraper.IsLoggedIn() {
-			logger.Error("Bad Cookies.")
-			askPass()
-		}
-		cookies := scraper.GetCookies()
-		js, _ := json.Marshal(cookies)
-		f, _ := os.OpenFile("twmd_cookies.json", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
-		defer f.Close()
-		f.Write(js)
-		break
-	}
-}
-
 func Login(useCookies bool) {
+	logger.Infof("Login function called, useCookies: %v", useCookies)
+	logger.Infof("authToken provided: %s", authToken)
+	logger.Infof("ct0Token provided: %s", ct0Token)
+
 	if useCookies {
 		if _, err := os.Stat("twmd_cookies.json"); errors.Is(err, fs.ErrNotExist) {
 			logger.Info("Enter cookies string: ")
@@ -805,7 +782,6 @@ func Login(useCookies bool) {
 			cookies := processCookieString(cookieStr)
 			scraper.SetCookies(cookies)
 
-			// Save cookies to file
 			js, _ := json.MarshalIndent(cookies, "", "  ")
 			f, _ := os.OpenFile("twmd_cookies.json", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 			defer f.Close()
@@ -818,8 +794,12 @@ func Login(useCookies bool) {
 			logger.Info(scraper.IsLoggedIn())
 		}
 	} else {
-		if _, err := os.Stat("twmd_cookies.json"); errors.Is(err, fs.ErrNotExist) {
-			askPass()
+		if authToken != "" && ct0Token != "" {
+			logger.Info("Setting auth token from parameters")
+			scraper.SetAuthToken(twitterscraper.AuthToken{Token: authToken, CSRFToken: ct0Token})
+		} else if _, err := os.Stat("twmd_cookies.json"); errors.Is(err, fs.ErrNotExist) {
+			logger.Error("auth_token and ct0 cookies are required. Please provide them via --auth-token and --ct0 parameters.")
+			os.Exit(1)
 		} else {
 			f, _ := os.Open("twmd_cookies.json")
 			var cookies []*http.Cookie
@@ -828,16 +808,27 @@ func Login(useCookies bool) {
 		}
 	}
 
-	if !scraper.IsLoggedIn() {
-		if useCookies {
-			logger.Error("Invalid cookies. Please try again.")
-			os.Remove("twmd_cookies.json")
-			Login(useCookies)
+	logger.Info("Checking login status...")
+	isLoggedIn := scraper.IsLoggedIn()
+	logger.Infof("Login status: %v", isLoggedIn)
+
+	if !isLoggedIn {
+		if authToken == "" || ct0Token == "" {
+			logger.Error("Invalid cookies. Please provide valid auth_token and ct0 via --auth-token and --ct0 parameters.")
+			os.Exit(1)
 		} else {
-			askPass()
+			logger.Error("Invalid cookies provided. Please check your auth_token and ct0 values.")
+			os.Exit(1)
 		}
 	} else {
-		logger.Info("Logged in.")
+		logger.Info("Logged in successfully.")
+		// Save cookies to file for future use
+		cookies := scraper.GetCookies()
+		js, _ := json.MarshalIndent(cookies, "", "  ")
+		f, _ := os.OpenFile("twmd_cookies.json", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+		defer f.Close()
+		f.Write(js)
+		logger.Info("Cookies saved to twmd_cookies.json")
 	}
 }
 
@@ -976,6 +967,8 @@ func main() {
 	op.On("-d", "--date-format FORMAT", "Apply custom date format. (https://go.dev/src/time/format.go)", &datefmt)
 	op.On("-L", "--login", "Login (needed for NSFW tweets)", &login)
 	op.On("-C", "--cookies", "Use cookies for authentication", &useCookies)
+	op.On("--auth-token AUTH_TOKEN", "Auth token from browser cookies", &authToken)
+	op.On("--ct0 CT0", "CT0 token from browser cookies", &ct0Token)
 	op.On("-p", "--proxy PROXY", "Use proxy (proto://ip:port)", &proxy)
 	op.On("-V", "--version", "Print version and exit", &printversion)
 	op.On("-B", "--no-banner", "Don't print banner", &nologo)
@@ -985,6 +978,7 @@ func main() {
 	op.Exemple("twmd -t 156170319961391104")
 	op.Exemple("twmd -t 156170319961391104 -f \"{DATE} {ID}\"")
 	op.Exemple("twmd -t 156170319961391104 -f \"{DATE} {ID}\" -d \"2006-01-02_15-04-05\"")
+	op.Exemple("twmd --auth-token YOUR_AUTH_TOKEN --ct0 YOUR_CT0 -t 156170319961391104")
 	op.Parse()
 
 	if printversion {

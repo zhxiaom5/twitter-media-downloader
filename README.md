@@ -26,8 +26,13 @@ This twitter downloader doesn't require Credentials or an api key. It's based on
   - Improved proxy support
 
 ### Note
-For NSFW or private accounts, you will need to logged in (-L). Username ans password login isn't supported anymore. You'll have to logged in in a browser and copy auth_token and ct0 cookies (right click => inspect => storage => cookies).
+For NSFW or private accounts, you will need to logged in (-L). Username and password login is no longer supported. You can provide auth_token and ct0 cookies directly via command line parameters `--auth-token` and `--ct0`, or login in a browser and copy auth_token and ct0 cookies (right click => inspect => storage => cookies).
 It will create a twmd_cookies.json so you will not have to enter these cookies everytime.
+
+**Quick Login Example:**
+```sh
+twmd --auth-token YOUR_AUTH_TOKEN --ct0 YOUR_CT0 -t 156170319961391104
+```
 
 
 ![gui](.github/screenshots/gui.png)
@@ -58,6 +63,8 @@ Usage:
                              (https://go.dev/src/time/format.go)
 -L, --login                  Login (needed for NSFW tweets)
 -C, --cookies                Use cookies for authentication
+--auth-token=AUTH_TOKEN      Auth token from browser cookies
+--ct0=CT0                    CT0 token from browser cookies
 -p, --proxy=PROXY            Use proxy (proto://ip:port)
 -V, --version                Print version and exit
 -B, --no-banner              Don't print banner
@@ -197,8 +204,13 @@ Check [here](https://gist.github.com/mmpx12/f0741d40909ed3f182fd6f9b33b580d7) fo
   - 改进了代理支持
 
 ### 注意
-对于 NSFW 或私人账户，您需要登录 (-L)。用户名和密码登录不再受支持。您需要在浏览器中登录并复制 auth_token 和 ct0 cookies（右键 => 检查 => 存储 => cookies）。
+对于 NSFW 或私人账户，您需要登录 (-L)。用户名和密码登录不再受支持。您可以通过命令行参数 `--auth-token` 和 `--ct0` 直接提供 auth_token 和 ct0 cookies，或者在浏览器中登录并复制 auth_token 和 ct0 cookies（右键 => 检查 => 存储 => cookies）。
 它会创建一个 twmd_cookies.json 文件，因此您不必每次都输入这些 cookies。
+
+**快速登录示例：**
+```sh
+twmd --auth-token YOUR_AUTH_TOKEN --ct0 YOUR_CT0 -t 156170319961391104
+```
 
 
 ![gui](.github/screenshots/gui.png)
@@ -227,6 +239,8 @@ Check [here](https://gist.github.com/mmpx12/f0741d40909ed3f182fd6f9b33b580d7) fo
                              (https://go.dev/src/time/format.go)
 -L, --login                  登录（NSFW 推文需要）
 -C, --cookies                使用 cookies 进行身份验证
+--auth-token=AUTH_TOKEN      浏览器 cookies 中的 auth token
+--ct0=CT0                    浏览器 cookies 中的 CT0 token
 -p, --proxy=PROXY            使用代理（proto://ip:port）
 -V, --version                打印版本并退出
 -B, --no-banner              不打印横幅
