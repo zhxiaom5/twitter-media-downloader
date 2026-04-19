@@ -4,23 +4,41 @@ This twitter downloader doesn't require Credentials or an api key. It's based on
 
 ## Recent Changes
 
+### v1.16.0
+- **Authentication Improvements**:
+  - Removed interactive login functionality
+  - Added command-line parameters `--auth-token` and `--ct0` for direct authentication
+  - Simplified login process with token-based authentication
+
+- **Filename Enhancement**:
+  - Added date prefix to filenames in format "YYYY-MM-DD_"
+  - Improved file existence check to detect both original and full filenames
+
+- **Cross-Platform Support**:
+  - Added compiled binaries for macOS Intel, Linux x86_64, and Windows x86_64
+  - Ensured consistent functionality across all major platforms
+
+- **Logging Enhancements**:
+  - Added detailed login process logging for better debugging
+  - Improved error messages for authentication issues
+
 ### v1.15.0
-- **Filename Generation Improvement**: 
+- **Filename Generation Improvement**:
   - Enhanced filename sanitization to handle special characters, URLs, and emojis
   - Adjusted tweet content length in filenames to 240 characters for better readability
 
-- **ASS Subtitle Generation**: 
+- **ASS Subtitle Generation**:
   - Added automatic ASS subtitle file generation for videos
   - Supports automatic line wrapping for long subtitles
   - Configured subtitles to be bottom-center aligned with proper margins
   - Optimized subtitle resolution settings (PlayResX: 1080, PlayResY: 1920)
 
-- **Logging System Upgrade**: 
+- **Logging System Upgrade**:
   - Replaced all `fmt.Printf` and `fmt.Println` calls with logrus logging methods
   - Added detailed logging for all operations
   - Configured logging format with timestamps and log levels
 
-- **Other Improvements**: 
+- **Other Improvements**:
   - Added comprehensive error handling
   - Optimized download process
   - Improved proxy support
@@ -181,6 +199,24 @@ Check [here](https://gist.github.com/mmpx12/f0741d40909ed3f182fd6f9b33b580d7) fo
 这个 Twitter 下载器不需要凭证或 API 密钥。它基于 [twitter-scrapper](https://github.com/imperatrona/twitter-scraper) 构建。
 
 ## 最近变更
+
+### v1.16.0
+- **认证改进**：
+  - 移除了交互式登录功能
+  - 添加了命令行参数 `--auth-token` 和 `--ct0` 用于直接认证
+  - 简化了基于令牌的登录过程
+
+- **文件名增强**：
+  - 在文件名开头添加了日期前缀，格式为 "YYYY-MM-DD_"
+  - 改进了文件存在检测，可同时检测原始文件名和完整文件名
+
+- **跨平台支持**：
+  - 添加了 macOS Intel、Linux x86_64 和 Windows x86_64 的编译二进制文件
+  - 确保在所有主要平台上的一致功能
+
+- **日志增强**：
+  - 添加了详细的登录过程日志，以便更好地调试
+  - 改进了认证问题的错误消息
 
 ### v1.15.0
 - **文件名生成改进**：
