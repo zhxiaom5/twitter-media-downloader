@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math/rand"
 	"net"
 	"net/http"
 	URL "net/url"
@@ -45,6 +46,25 @@ var (
 
 	// Logger instance
 	logger = logrus.New()
+
+	// Rate limiting variables
+	requestCount     int
+	requestCountLock sync.Mutex
+	lastRequestTime  time.Time
+	lastMinuteReset  time.Time
+
+	// 429 error handling
+	consecutive429Count int
+	isCoolingDown       bool
+	coolingDownStart    time.Time
+
+	// Retry configuration
+	maxRetries    = 3
+	retryWaitBase = 10 * time.Second
+
+	// Batch control
+	tweetCount      int
+	batchPauseCount = 50
 )
 
 func init() {
@@ -56,6 +76,94 @@ func init() {
 	})
 	logger.SetOutput(os.Stdout)
 	logger.SetLevel(logrus.InfoLevel)
+
+	lastMinuteReset = time.Now()
+}
+
+func randomDuration(minSec, maxSec int) time.Duration {
+	sec := minSec + rand.Intn(maxSec-minSec+1)
+	return time.Duration(sec) * time.Second
+}
+
+func waitForRateLimit() {
+	requestCountLock.Lock()
+	defer requestCountLock.Unlock()
+
+	now := time.Now()
+
+	if now.Sub(lastMinuteReset) >= time.Minute {
+		requestCount = 0
+		lastMinuteReset = now
+	}
+
+	if requestCount >= 60 {
+		waitTime := time.Minute - now.Sub(lastMinuteReset)
+		logger.Warnf("Rate limit reached (60 requests/min), waiting %v", waitTime)
+		time.Sleep(waitTime)
+		requestCount = 0
+		lastMinuteReset = time.Now()
+	}
+
+	waitTime := time.Duration(1+rand.Intn(3)) * time.Second
+	if !lastRequestTime.IsZero() {
+		elapsed := now.Sub(lastRequestTime)
+		if elapsed < waitTime {
+			time.Sleep(waitTime - elapsed)
+		}
+	}
+
+	requestCount++
+	lastRequestTime = time.Now()
+}
+
+func handle429Error() bool {
+	requestCountLock.Lock()
+	consecutive429Count++
+	requestCountLock.Unlock()
+
+	if consecutive429Count == 1 {
+		waitTime := time.Duration(3+rand.Intn(3)) * time.Minute
+		logger.Warnf("429 Too Many Requests detected. Cooling down for %v (first offense)", waitTime)
+		isCoolingDown = true
+		coolingDownStart = time.Now()
+		time.Sleep(waitTime)
+		isCoolingDown = false
+		return true
+	} else if consecutive429Count >= 2 {
+		waitTime := time.Duration(10+rand.Intn(6)) * time.Minute
+		logger.Warnf("429 Too Many Requests detected again. Extended cooling down for %v (offense #%d)", waitTime, consecutive429Count)
+		isCoolingDown = true
+		coolingDownStart = time.Now()
+		time.Sleep(waitTime)
+		isCoolingDown = false
+		return true
+	}
+	return false
+}
+
+func reset429Count() {
+	requestCountLock.Lock()
+	consecutive429Count = 0
+	requestCountLock.Unlock()
+}
+
+func checkAndPauseForBatch() {
+	requestCountLock.Lock()
+	tweetCount++
+	currentCount := tweetCount
+	requestCountLock.Unlock()
+
+	if currentCount > 0 && currentCount%batchPauseCount == 0 {
+		waitTime := time.Duration(2+rand.Intn(2)) * time.Minute
+		logger.Infof("Processed %d tweets, pausing for %v to avoid rate limit", currentCount, waitTime)
+		time.Sleep(waitTime)
+	}
+}
+
+func getRetryWaitTime(retryCount int) time.Duration {
+	waitTime := retryWaitBase * time.Duration(1<<retryCount)
+	randomAdd := time.Duration(rand.Intn(10)) * time.Second
+	return waitTime + randomAdd
 }
 
 func generateNFOFile(tweet interface{}, videoUrl string, output string, dwn_type string) {
@@ -89,7 +197,7 @@ func generateNFOFile(tweet interface{}, videoUrl string, output string, dwn_type
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 			description = t.Text
 		} else {
 			description = "没有推文"
@@ -100,7 +208,7 @@ func generateNFOFile(tweet interface{}, videoUrl string, output string, dwn_type
 		tweetID = t.ID
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 			description = t.Text
 		} else {
 			description = "没有推文"
@@ -189,11 +297,11 @@ func generateASSFile(tweet interface{}, videoUrl string, output string, dwn_type
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	}
 
@@ -273,11 +381,11 @@ func saveTweetJSON(tweet interface{}, videoUrl string, output string, dwn_type s
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	}
 
@@ -395,11 +503,11 @@ func downloadThumbnail(wg *sync.WaitGroup, tweet interface{}, video interface{},
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	}
 
@@ -482,11 +590,11 @@ func download(wg *sync.WaitGroup, tweet interface{}, url string, filetype string
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 100)
+			tweetContent = sanitizeText(t.Text, regex, 50)
 		}
 	}
 
@@ -833,25 +941,49 @@ func Login(useCookies bool) {
 }
 
 func singleTweet(output string, id string) {
-	tweet, err := scraper.GetTweet(id)
-	if err != nil {
-		logger.Error(err)
-		os.Exit(1)
-	}
-	if tweet == nil {
-		logger.Error("Error retrieve tweet")
-		return
-	}
-	if usr != "" {
-		if vidz {
-			videoSingle(tweet, output)
+	waitForRateLimit()
+
+	var lastErr error
+	for retry := 0; retry < maxRetries; retry++ {
+		tweet, err := scraper.GetTweet(id)
+		if err != nil {
+			lastErr = err
+			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "Too Many Requests") {
+				if !handle429Error() {
+					break
+				}
+				continue
+			}
+			logger.Errorf("Error fetching tweet: %s", err.Error())
+			if retry < maxRetries-1 {
+				waitTime := getRetryWaitTime(retry)
+				logger.Infof("Retrying in %v (attempt %d/%d)", waitTime, retry+1, maxRetries)
+				time.Sleep(waitTime)
+				continue
+			}
+			os.Exit(1)
 		}
-		if imgs {
+		if tweet == nil {
+			logger.Error("Error retrieve tweet")
+			return
+		}
+		reset429Count()
+		checkAndPauseForBatch()
+		if usr != "" {
+			if vidz {
+				videoSingle(tweet, output)
+			}
+			if imgs {
+				photoSingle(tweet, output)
+			}
+		} else {
+			videoSingle(tweet, output)
 			photoSingle(tweet, output)
 		}
-	} else {
-		videoSingle(tweet, output)
-		photoSingle(tweet, output)
+		return
+	}
+	if lastErr != nil {
+		logger.Errorf("Failed to fetch tweet after %d retries: %s", maxRetries, lastErr.Error())
 	}
 }
 
@@ -1079,10 +1211,23 @@ func main() {
 	}
 
 	for tweet := range tweets {
+		waitForRateLimit()
+
 		if tweet.Error != nil {
-			logger.Error(tweet.Error)
-			os.Exit(1)
+			if strings.Contains(tweet.Error.Error(), "429") || strings.Contains(tweet.Error.Error(), "Too Many Requests") {
+				if !handle429Error() {
+					logger.Errorf("429 error persisted after cooldown, skipping tweet: %s", tweet.ID)
+					continue
+				}
+			} else {
+				logger.Errorf("Error fetching tweet: %s", tweet.Error.Error())
+				continue
+			}
 		}
+
+		reset429Count()
+		checkAndPauseForBatch()
+
 		if vidz {
 			wg.Add(1)
 			go videoUser(&wg, tweet, output, retweet)
