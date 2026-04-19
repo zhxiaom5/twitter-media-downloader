@@ -89,7 +89,7 @@ func generateNFOFile(tweet interface{}, videoUrl string, output string, dwn_type
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 			description = t.Text
 		} else {
 			description = "没有推文"
@@ -100,7 +100,7 @@ func generateNFOFile(tweet interface{}, videoUrl string, output string, dwn_type
 		tweetID = t.ID
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 			description = t.Text
 		} else {
 			description = "没有推文"
@@ -189,11 +189,11 @@ func generateASSFile(tweet interface{}, videoUrl string, output string, dwn_type
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	}
 
@@ -273,11 +273,11 @@ func saveTweetJSON(tweet interface{}, videoUrl string, output string, dwn_type s
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	}
 
@@ -395,11 +395,11 @@ func downloadThumbnail(wg *sync.WaitGroup, tweet interface{}, video interface{},
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	}
 
@@ -482,11 +482,11 @@ func download(wg *sync.WaitGroup, tweet interface{}, url string, filetype string
 	switch t := tweet.(type) {
 	case *twitterscraper.TweetResult:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	case *twitterscraper.Tweet:
 		if t.Text != "" {
-			tweetContent = sanitizeText(t.Text, regex, 240)
+			tweetContent = sanitizeText(t.Text, regex, 100)
 		}
 	}
 
